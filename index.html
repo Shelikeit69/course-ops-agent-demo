@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102b28">
+  <meta name="description" content="A fictional, approval-first course operations agent demo.">
+  <title>Course Operations · Agent Demo</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./src/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="brand"><span class="brand-mark">◌</span><span>COURSE<br><strong>OPERATIONS</strong></span></div>
+      <div class="sidebar-kicker">AGENT WORKSPACE <span class="live-dot"></span></div>
+      <nav id="nav" class="nav">
+        <button type="button" data-view="overview" class="active"><span>⌂</span> Overview</button>
+        <button type="button" data-view="approvals"><span>◇</span> Coach's approvals <span id="approval-count" class="nav-count"></span></button>
+        <button type="button" data-view="calendar"><span>▦</span> Calendar</button>
+        <button type="button" data-view="students"><span>◎</span> Students</button>
+        <button type="button" data-view="outbox"><span>✉</span> Email preview</button>
+        <button type="button" data-view="activity"><span>≡</span> Activity log</button>
+      </nav>
+      <div class="sidebar-bottom"><div class="avatar">C</div><div><strong>Coach's view</strong><small>Decision maker</small></div></div>
+    </aside>
+    <div class="main-wrap">
+      <header class="topbar"><span>Workspace / <strong id="breadcrumb">Overview</strong></span><span class="demo-pill">● DEMO MODE · NO LIVE CONNECTIONS</span></header>
+      <main id="app" tabindex="-1"></main>
+      <footer class="footer">Fictional people & sample data · Singapore time (SGT) · Nothing here sends email or creates a real Zoom meeting</footer>
+    </div>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
