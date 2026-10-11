@@ -32,5 +32,5 @@
 **Files:** Modify `README.md` if needed.
 
 - [x] Run targeted and full tests, inspect the browser view and workflow.
-- [ ] Commit and push to the existing GitHub Pages repository.
-- [ ] Verify the published page loads the updated interface.
+- [x] Commit and push to the existing GitHub Pages repository.
+- [x] Verify the published page loads the updated interface.
