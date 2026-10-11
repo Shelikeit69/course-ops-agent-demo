@@ -1,12 +1,16 @@
 import { STORAGE_KEY, seed, approve, returnRequest, changeTime, requestReschedule, confirmPayment, confirmCompletion, addInquiry, preparePaymentNote, conflicts, formatDate } from './workflow.js';
+import { weekMonday, shiftWeek, weekDays, eventPosition } from './calendar.js';
 
 const labels = { overview: 'Overview', approvals: "Coach's approvals", calendar: 'Calendar', students: 'Students', outbox: 'Email preview', activity: 'Activity log', intake: 'New inquiry' };
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const dateInput = value => { const date = new Date(value); const sgt = new Date(date.getTime() + 8 * 3600000); return sgt.toISOString().slice(0,16); };
 const asSingaporeTime = value => `${value}:00+08:00`;
 let view = 'overview';
+let calendarWeek;
+let selectedEventId = null;
 let state;
 try { state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || seed(); if (!Array.isArray(state.requests) || !Array.isArray(state.events)) throw new Error('invalid'); } catch { state = seed(); }
+calendarWeek = weekMonday(state.events[0]?.startsAt || new Date());
 const app = document.querySelector('#app');
 
 function save(next) { state = next; localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); render(); }
@@ -35,8 +39,28 @@ function approvalCard(request) {
 function approvals() { return `${header('HUMAN DECISION GATE', "Coach's approvals", 'Every email or LinkedIn-led calendar change waits here until Coach decides.')}
   <div class="notice"><strong>Approval rule:</strong> The agent can prepare a proposal and check conflicts. Only Coach's approval creates or changes a demo calendar entry.</div><div class="detail-grid">${pending().map(approvalCard).join('') || `<div class="panel">${empty('Everything has been reviewed. Add a sample inquiry to continue the demo.')}</div>`}</div>`; }
 
-function calendar() { const events = [...state.events].sort((a,b) => new Date(a.startsAt)-new Date(b.startsAt)); return `${header('SINGAPORE TIME', 'Calendar & sessions', 'Only Coach-approved sessions appear here. Each meeting belongs to one person and one session.')}
-  <div class="notice">Zoom links below use <strong>example.invalid</strong>. They are visual placeholders, not real meetings. Customer emails are simulated.</div><section class="panel table-wrap"><table class="data-table"><thead><tr><th>When</th><th>Customer & session</th><th>Demo meeting link</th><th>Status</th><th>Actions</th></tr></thead><tbody>${events.map(event => `<tr><td><strong>${formatDate(event.startsAt)}</strong><div class="muted tiny">${event.minutes} min · SGT</div></td><td><strong>${escape(event.person)}</strong><div class="muted tiny">${escape(event.email)}<br>${escape(event.kind)} · ${escape(event.id)}</div></td><td><span class="meeting-url">${escape(event.meetingUrl)}</span></td><td><span class="tag ${event.completed ? '' : 'amber'}">${event.completed ? 'Coach confirmed complete' : 'Scheduled'}</span></td><td><div class="actions"><button class="button ghost" data-action="reschedule" data-id="${escape(event.id)}">Request new time</button>${event.completed ? '' : `<button class="button light" data-action="complete" data-id="${escape(event.id)}">Mark complete</button>`}</div></td></tr>`).join('')}</tbody></table>${events.length ? '' : empty('No approved sessions yet.')}</section>`; }
+function calendar() {
+  const days = weekDays(calendarWeek);
+  const visible = state.events.filter(event => eventPosition(event.startsAt, calendarWeek).dayIndex >= 0);
+  const selected = visible.find(event => event.id === selectedEventId) || visible[0];
+  const firstHour = Math.min(8, ...visible.map(event => Math.floor(eventPosition(event.startsAt, calendarWeek).minuteOfDay / 60)));
+  const lastHour = Math.max(20, ...visible.map(event => Math.ceil((eventPosition(event.startsAt, calendarWeek).minuteOfDay + event.minutes) / 60)));
+  const hours = Array.from({ length: lastHour - firstHour }, (_, index) => firstHour + index);
+  const firstDate = new Date(`${days[0].key}T00:00:00Z`);
+  const lastDate = new Date(`${days[6].key}T00:00:00Z`);
+  const month = date => new Intl.DateTimeFormat('en-GB', { month: 'long', timeZone: 'UTC' }).format(date);
+  const monthRange = firstDate.getUTCMonth() === lastDate.getUTCMonth() ? `${days[0].number}–${days[6].number} ${month(firstDate)} ${firstDate.getUTCFullYear()}` : `${days[0].number} ${month(firstDate)} – ${days[6].number} ${month(lastDate)} ${lastDate.getUTCFullYear()}`;
+  return `${header('SINGAPORE TIME · SGT', 'Calendar & sessions', 'Approved sessions appear at their scheduled day and hour. Select one to see the customer, meeting link, and actions.')}
+    <section class="calendar-board panel" aria-label="Weekly session calendar">
+      <div class="calendar-toolbar"><div><span class="eyebrow">WEEK OF</span><h2>${escape(monthRange)}</h2></div><div class="calendar-nav"><button class="button ghost" data-action="calendar-prev" aria-label="Previous week">←</button><button class="button ghost" data-action="calendar-today">This week</button><button class="button ghost" data-action="calendar-next" aria-label="Next week">→</button></div></div>
+      <div class="calendar-scroll"><div class="week-grid" style="--hours:${hours.length}"><div class="time-header">SGT</div>${days.map(day => `<div class="day-header"><span>${day.label}</span><strong>${day.number}</strong></div>`).join('')}
+      <div class="time-rail">${hours.map(hour => `<div>${String(hour).padStart(2, '0')}:00</div>`).join('')}</div>
+      ${days.map((day, dayIndex) => `<div class="day-track" aria-label="${day.label} ${day.key}">${visible.filter(event => eventPosition(event.startsAt, calendarWeek).dayIndex === dayIndex).map(event => { const position = eventPosition(event.startsAt, calendarWeek); const top = (position.minuteOfDay - firstHour * 60); const height = Math.max(15, event.minutes); const time = `${String(Math.floor(position.minuteOfDay / 60)).padStart(2, '0')}:${String(position.minuteOfDay % 60).padStart(2, '0')}`; return `<button class="calendar-event${event.kind === 'Paid session' ? ' paid' : ''}${event.id === selected?.id ? ' selected' : ''}${event.completed ? ' completed' : ''}${event.minutes < 30 ? ' compact' : ''}" style="top:${top}px;height:${height}px" data-event-id="${escape(event.id)}" aria-label="${escape(time)} ${escape(event.person)}, ${escape(event.kind)}"><strong>${time} ${escape(event.person)}</strong>${event.minutes < 30 ? '' : `<span>${escape(event.kind)} · ${event.minutes} min</span>`}</button>`; }).join('')}</div>`).join('')}</div></div>
+      <div class="calendar-foot"><span class="calendar-key"><i></i> Free introduction</span><span class="calendar-key paid"><i></i> Paid session</span><span>${visible.length} approved session${visible.length === 1 ? '' : 's'} this week</span></div>
+    </section>
+    <section class="session-detail panel" aria-live="polite">${selected ? `<div><div class="eyebrow">SELECTED SESSION · ${escape(selected.id)}</div><h2>${escape(selected.person)}</h2><p>${escape(selected.kind)} · ${formatDate(selected.startsAt)} SGT · ${selected.minutes} min</p><p class="muted tiny">${escape(selected.email)} · ${selected.completed ? 'Coach confirmed complete' : 'Scheduled'}</p></div><div class="session-detail-actions"><div class="tiny muted">Demo Zoom link · placeholder only</div><span class="meeting-url">${escape(selected.meetingUrl)}</span><div class="actions"><button class="button ghost" data-action="reschedule" data-id="${escape(selected.id)}">Request new time</button>${selected.completed ? '' : `<button class="button light" data-action="complete" data-id="${escape(selected.id)}">Mark complete</button>`}</div></div>` : empty('No approved sessions this week. Use the arrows to browse other weeks.')}</section>
+    <div class="notice calendar-notice">Zoom links use <strong>example.invalid</strong>. They are placeholders; customer emails are simulated.</div>`;
+}
 
 function students() { return `${header('LEARNING RELATIONSHIPS', 'Students', 'Course length stays flexible. Payment and attendance are confirmed by Coach, not inferred by the agent.')}
   <section class="panel table-wrap"><table class="data-table"><thead><tr><th>Student</th><th>Payment</th><th>Arranged</th><th>Completed</th><th>Coach's action</th></tr></thead><tbody>${state.students.map(student => { const sessions = state.events.filter(event => event.email === student.email && event.kind === 'Paid session'); return `<tr><td><strong>${escape(student.name)}</strong><div class="muted tiny">${escape(student.email)}</div></td><td><span class="tag ${student.payment === 'Unconfirmed' ? 'amber' : ''}">${escape(student.payment)}</span></td><td>${sessions.length}</td><td>${sessions.filter(event => event.completed).length}</td><td><div class="actions">${student.payment === 'Unconfirmed' ? `<button class="button ghost" data-action="payment" data-email="${escape(student.email)}">Confirm payment</button>` : '<span class="muted tiny">Confirmed by Coach</span>'}<button class="button light" data-action="billing" data-email="${escape(student.email)}">Prepare fee note</button></div></td></tr>`; }).join('')}</tbody></table></section><div class="notice" style="margin-top:20px">Demo policy: course fees are collected in full upfront and are non-refundable. Coach decides whether a real payment has been received.</div>`; }
@@ -60,8 +84,12 @@ function render() {
 document.addEventListener('click', event => {
   const button = event.target.closest('button'); if (!button) return;
   if (button.dataset.view) { view = button.dataset.view; render(); app.focus(); return; }
+  if (button.dataset.eventId) { selectedEventId = button.dataset.eventId; render(); document.querySelector(`[data-event-id="${selectedEventId}"]`)?.focus(); return; }
   const id = button.dataset.id;
   switch (button.dataset.action) {
+    case 'calendar-prev': calendarWeek = shiftWeek(calendarWeek, -1); selectedEventId = null; render(); document.querySelector('[data-action="calendar-prev"]')?.focus(); break;
+    case 'calendar-next': calendarWeek = shiftWeek(calendarWeek, 1); selectedEventId = null; render(); document.querySelector('[data-action="calendar-next"]')?.focus(); break;
+    case 'calendar-today': calendarWeek = weekMonday(new Date()); selectedEventId = null; render(); document.querySelector('[data-action="calendar-today"]')?.focus(); break;
     case 'approve': run(() => approve(state,id), 'Coach approved the time. Demo calendar and email preview updated.'); break;
     case 'return': run(() => returnRequest(state,id), 'Returned for a new proposal.'); break;
     case 'time': { const input = document.querySelector(`[data-time-for="${id}"]`); run(() => changeTime(state,id,asSingaporeTime(input.value)), 'New time prepared for Coach’s review.'); break; }

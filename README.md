@@ -4,13 +4,13 @@ A small, English-language browser demo of an approval-first assistant for a pers
 
 ## One-click preview
 
-Once GitHub Pages is enabled for this repository, open the Pages URL shown under **Settings → Pages**. The site is static, so it can be hosted directly from the `main` branch root without a build step.
+Open the [live GitHub Pages preview](https://shelikeit69.github.io/course-ops-agent-demo/). The site is static and deploys from the `main` branch root without a build step.
 
 ## What to try
 
 1. Open **Coach's approvals**. One sample request conflicts with an existing session; propose another time before approving it.
-2. Approve a free introduction. The demo creates a calendar row, a sample meeting URL, a simulated confirmation email, and a reminder entry.
-3. Open **Calendar** and request a new time. The original session remains until the new time is approved.
+2. Approve a free introduction. The demo places it in the weekly calendar, creates a sample meeting URL, a simulated confirmation email, and a reminder entry.
+3. Open **Calendar** to view sessions by day and hour in Singapore time. Browse weeks, select a session for details, and request a new time. The original session remains until the new time is approved.
 4. Open **Students**. Confirm payment, prepare a fee note, and mark a session complete. These are explicit Coach actions.
 5. Open **Email preview** and **Activity log** to see the resulting drafts and decisions.
 
